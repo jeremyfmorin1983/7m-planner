@@ -11,6 +11,7 @@ const NAV = [
   { href: '/contracts', label: 'Contracts' },
   { href: '/assets',    label: 'Assets' },
   { href: '/other',     label: 'Other' },
+  { href: '/actuals',   label: 'Actuals' },
   { href: '/bonus',     label: 'Bonus Calculator' },
 ]
 
