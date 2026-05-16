@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { DEPARTMENTS, ASSET_TYPES, getDepts, getPhases, getCategories } from '@/lib/dropdowns'
 
 export interface FieldDef {
   key: string
   label: string
-  type?: 'text' | 'number' | 'date'
+  type?: 'text' | 'number' | 'date' | 'select' | 'phase' | 'category'
+  options?: string[]
 }
 
 interface Props {
@@ -34,6 +36,21 @@ export default function RowEditPanel({ table, row, fields, onClose, onSaved }: P
 
   if (!row) return null
 
+  function set(key: string, val: string) {
+    setValues(prev => {
+      const next = { ...prev, [key]: val }
+      // Reset downstream cascades when dept or phase changes
+      if (key === 'department') {
+        next.phase = ''
+        next.category = ''
+      }
+      if (key === 'phase') {
+        next.category = ''
+      }
+      return next
+    })
+  }
+
   async function handleSave() {
     if (!row) return
     setSaving(true)
@@ -47,12 +64,62 @@ export default function RowEditPanel({ table, row, fields, onClose, onSaved }: P
     const supabase = createClient()
     const { error } = await supabase.from(table).update(updates).eq('id', row.id)
     if (error) {
-      setError(error.message)
+      setError(error.message.includes('row-level security')
+        ? "You don't have permission to edit this row."
+        : error.message)
       setSaving(false)
     } else {
       onSaved({ ...row, ...updates })
       onClose()
     }
+  }
+
+  function renderField(f: FieldDef) {
+    const val = values[f.key] ?? ''
+    const cls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+
+    if (f.type === 'select') {
+      const opts = f.options ?? []
+      return (
+        <select value={val} onChange={e => set(f.key, e.target.value)} className={cls}>
+          <option value="">— select —</option>
+          {opts.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      )
+    }
+
+    if (f.type === 'phase') {
+      const dept = values['department'] ?? ''
+      const phases = dept ? getPhases(table, dept) : []
+      return (
+        <select value={val} onChange={e => set(f.key, e.target.value)} className={cls} disabled={!dept}>
+          <option value="">— {dept ? 'select phase' : 'select department first'} —</option>
+          {phases.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+      )
+    }
+
+    if (f.type === 'category') {
+      const dept = values['department'] ?? ''
+      const phase = values['phase'] ?? ''
+      const cats = dept && phase ? getCategories(table, dept, phase) : []
+      return (
+        <select value={val} onChange={e => set(f.key, e.target.value)} className={cls} disabled={!phase}>
+          <option value="">— {phase ? 'select category' : 'select phase first'} —</option>
+          {cats.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      )
+    }
+
+    if (f.type === 'number') {
+      return <input type="number" value={val} onChange={e => set(f.key, e.target.value)} className={cls} />
+    }
+
+    if (f.type === 'date') {
+      return <input type="date" value={val} onChange={e => set(f.key, e.target.value)} className={cls} />
+    }
+
+    return <input type="text" value={val} onChange={e => set(f.key, e.target.value)} className={cls} />
   }
 
   return (
@@ -68,17 +135,12 @@ export default function RowEditPanel({ table, row, fields, onClose, onSaved }: P
           {fields.map(f => (
             <div key={f.key}>
               <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
-              <input
-                type={f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text'}
-                value={values[f.key] ?? ''}
-                onChange={e => setValues(v => ({ ...v, [f.key]: e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              {renderField(f)}
             </div>
           ))}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-sm">
-              {error.includes('row-level security') ? "You don't have permission to edit this row." : error}
+              {error}
             </div>
           )}
         </div>

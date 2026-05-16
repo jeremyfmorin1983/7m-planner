@@ -11,8 +11,10 @@ const COLUMNS = [
 ]
 
 const EDIT_FIELDS = [
-  { key: 'department', label: 'Department' },
-  { key: 'asset_type', label: 'Asset Type' },
+  { key: 'department', label: 'Department', type: 'select' as const, options: ['Business','IT','Production'] },
+  { key: 'phase', label: 'Phase', type: 'phase' as const },
+  { key: 'category', label: 'Category', type: 'category' as const },
+  { key: 'asset_type', label: 'Asset Type', type: 'select' as const, options: ['Audio','Computers','Lighting','Other','Power','Video'] },
   { key: 'brand', label: 'Brand' },
   { key: 'model', label: 'Model' },
   { key: 'serial_number', label: 'Serial #' },

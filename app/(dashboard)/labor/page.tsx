@@ -10,7 +10,7 @@ const COLUMNS = [
 const EDIT_FIELDS = [
   { key: 'name', label: 'Name' },
   { key: 'role', label: 'Role' },
-  { key: 'functional_dept', label: 'Department' },
+  { key: 'functional_dept', label: 'Department', type: 'select' as const, options: ['Admin','Business','Care & Assimilation','College','Communications','Facility','Groups','IT','Kids','Missions','Pastoral','Preteen','Production','Students','Worship'] },
   { key: 'start_date', label: 'Start Date', type: 'date' as const },
   { key: 'total_comp', label: 'Total Comp', type: 'number' as const },
   { key: 'base', label: 'Base Salary', type: 'number' as const },

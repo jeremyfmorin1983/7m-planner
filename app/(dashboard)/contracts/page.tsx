@@ -9,9 +9,9 @@ const COLUMNS = [
 ]
 
 const EDIT_FIELDS = [
-  { key: 'department', label: 'Department' },
-  { key: 'phase', label: 'Phase' },
-  { key: 'category', label: 'Category' },
+  { key: 'department', label: 'Department', type: 'select' as const, options: ['Admin','Business','Care & Assimilation','College','Communications','Facility','Groups','IT','Kids','Missions','Pastoral','Preteen','Production','Students','Worship'] },
+  { key: 'phase', label: 'Phase', type: 'phase' as const },
+  { key: 'category', label: 'Category', type: 'category' as const },
   { key: 'type', label: 'Type' },
   { key: 'description', label: 'Description' },
   { key: 'vendor', label: 'Vendor' },
