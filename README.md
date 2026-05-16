@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 7M Financial Planner
 
-## Getting Started
+Church budget planning app for department leads. Built with Next.js, Supabase, and Vercel.
 
-First, run the development server:
+## Setup (one-time)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### 1. Create a Supabase project
+1. Go to [supabase.com](https://supabase.com) → New project
+2. In the SQL editor, paste and run `supabase-schema.sql` from this folder
+3. Copy your **Project URL** and **anon public key** from Settings → API
+
+### 2. Configure environment variables
+Edit `.env.local`:
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Import your Excel data
+```bash
+pip3 install openpyxl
+SUPABASE_URL=https://your-project.supabase.co \
+SUPABASE_KEY=your-service-role-key \
+python3 scripts/import-excel.py
+```
+Use the **service role key** (not anon) for the import — found in Settings → API → service_role.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 4. Create user accounts
+In Supabase → Authentication → Users, invite each department lead by email.
+Then in the `profiles` table, set their `department` and `is_admin` fields.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 5. Run locally
+```bash
+npm run dev
+```
+Open http://localhost:3000
 
-## Learn More
+## Deploy to Netlify
+1. Push this folder to a GitHub repo
+2. Go to [netlify.com](https://netlify.com) → Add new site → Import from Git
+3. Build command: `npm run build` — Netlify will detect this automatically
+4. Add the two env vars in Site settings → Environment variables:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+5. Deploy — done
 
-To learn more about Next.js, take a look at the following resources:
+## Pages
+| Page | Description |
+|------|-------------|
+| Dashboard | Budget summary and monthly chart |
+| Labor | Staff roster with monthly payroll |
+| Contracts | Vendor contracts by department |
+| Assets | Equipment inventory with refresh alerts |
+| Other | Miscellaneous budget items |
+| Bonus Calculator | Enter actual revenue → see bonus tier + per-staff estimates |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Access control
+- Everyone logged in can **view** all departments
+- Each lead can only **edit** rows matching their department
+- Admins (`is_admin = true`) can edit everything
