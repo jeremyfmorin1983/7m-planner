@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import BudgetTable from '@/components/BudgetTable'
-import { fmt } from '@/lib/utils'
+import EditableBudgetTable from '@/components/EditableBudgetTable'
 
 const COLUMNS = [
   { key: 'department', label: 'Department' },
@@ -9,9 +8,21 @@ const COLUMNS = [
   { key: 'model', label: 'Model' },
   { key: 'location_user', label: 'Location/User' },
   { key: 'quantity', label: 'Qty' },
-  { key: 'unit_cost', label: 'Unit Cost' },
-  { key: 'refresh_date', label: 'Refresh Date' },
-  { key: 'refresh_status', label: 'Status' },
+]
+
+const EDIT_FIELDS = [
+  { key: 'department', label: 'Department' },
+  { key: 'asset_type', label: 'Asset Type' },
+  { key: 'brand', label: 'Brand' },
+  { key: 'model', label: 'Model' },
+  { key: 'serial_number', label: 'Serial #' },
+  { key: 'comments', label: 'Comments' },
+  { key: 'location_user', label: 'Location / User' },
+  { key: 'purchase_date', label: 'Purchase Date', type: 'date' as const },
+  { key: 'life_in_months', label: 'Life (months)', type: 'number' as const },
+  { key: 'refresh_date', label: 'Refresh Date', type: 'date' as const },
+  { key: 'unit_cost', label: 'Unit Cost', type: 'number' as const },
+  { key: 'quantity', label: 'Quantity', type: 'number' as const },
 ]
 
 export default async function AssetsPage() {
@@ -19,27 +30,19 @@ export default async function AssetsPage() {
   const { data: rows } = await supabase.from('assets').select('*').order('department')
 
   const today = new Date()
-  const formatted = (rows || []).map(r => {
-    const refresh = r.refresh_date ? new Date(r.refresh_date) : null
-    const isPastDue = refresh && refresh < today
-    const isDueSoon = refresh && !isPastDue && (refresh.getTime() - today.getTime()) < 365 * 24 * 60 * 60 * 1000
-
-    return {
-      ...r,
-      unit_cost: r.unit_cost != null ? fmt(r.unit_cost) : '—',
-      refresh_date: refresh ? refresh.toLocaleDateString() : '—',
-      refresh_status: isPastDue ? '⚠ Past due' : isDueSoon ? '→ Due this year' : refresh ? 'OK' : '—',
-    }
-  })
-
-  const pastDueCount = formatted.filter(r => r.refresh_status === '⚠ Past due').length
+  const pastDueCount = (rows || []).filter(r => {
+    const d = r.refresh_date ? new Date(r.refresh_date) : null
+    return d && d < today
+  }).length
 
   return (
     <div className="max-w-full space-y-6">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Assets</h1>
-          <p className="text-sm text-gray-500 mt-1">Equipment inventory with refresh tracking</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Equipment inventory. Click ✎ to edit a row, click a monthly cell to edit the amount.
+          </p>
         </div>
         {pastDueCount > 0 && (
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-2 text-sm">
@@ -47,13 +50,13 @@ export default async function AssetsPage() {
           </div>
         )}
       </div>
-
       <div className="bg-white rounded-xl p-4 border border-gray-200">
-        <BudgetTable
+        <EditableBudgetTable
+          table="assets"
           columns={COLUMNS}
-          rows={formatted}
-          showMonths={true}
-          emptyMessage="No assets yet. Import from Excel or add via Supabase."
+          initialRows={rows || []}
+          editFields={EDIT_FIELDS}
+          deptKey="department"
         />
       </div>
     </div>
