@@ -3,12 +3,38 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { DEPARTMENTS, ASSET_TYPES, getDepts, getPhases, getCategories } from '@/lib/dropdowns'
+import { MONTHS, Month, MONTH_LABELS } from '@/lib/types'
+import { fmt } from '@/lib/utils'
 
 export interface FieldDef {
   key: string
   label: string
   type?: 'text' | 'number' | 'date' | 'select' | 'phase' | 'category'
   options?: string[]
+}
+
+// Returns which of the 12 month keys fall within start_date..end_date (year-agnostic: uses month numbers only)
+function distributeContract(amount: number, startDate: string, endDate: string): Record<string, number> | null {
+  if (!amount || !startDate || !endDate) return null
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return null
+
+  // Collect all year/month combos in range, but only keep months 1-12 of the start year
+  const year = start.getFullYear()
+  const activeMonths: number[] = []
+  const cur = new Date(start.getFullYear(), start.getMonth(), 1)
+  const endMonth = new Date(end.getFullYear(), end.getMonth(), 1)
+  while (cur <= endMonth) {
+    if (cur.getFullYear() === year) activeMonths.push(cur.getMonth() + 1)
+    cur.setMonth(cur.getMonth() + 1)
+  }
+  if (activeMonths.length === 0) return null
+
+  const monthly = Math.round((amount / activeMonths.length) * 100) / 100
+  const dist: Record<string, number> = Object.fromEntries(MONTHS.map(m => [m, 0]))
+  activeMonths.forEach(mn => { dist[MONTHS[mn - 1]] = monthly })
+  return dist
 }
 
 interface Props {
@@ -51,6 +77,15 @@ export default function RowEditPanel({ table, row, fields, onClose, onSaved }: P
     })
   }
 
+  // Live distribution preview for contracts
+  const distribution = table === 'contracts'
+    ? distributeContract(
+        parseFloat(values['contract_amount']) || 0,
+        values['start_date'] ?? '',
+        values['end_date'] ?? ''
+      )
+    : null
+
   async function handleSave() {
     if (!row) return
     setSaving(true)
@@ -61,6 +96,8 @@ export default function RowEditPanel({ table, row, fields, onClose, onSaved }: P
       if (f.type === 'number') updates[f.key] = v === '' ? null : parseFloat(v)
       else updates[f.key] = v === '' ? null : v
     })
+    // Auto-distribute contract amount across months
+    if (distribution) Object.assign(updates, distribution)
     const supabase = createClient()
     const { error } = await supabase.from(table).update(updates).eq('id', row.id)
     if (error) {
@@ -138,6 +175,25 @@ export default function RowEditPanel({ table, row, fields, onClose, onSaved }: P
               {renderField(f)}
             </div>
           ))}
+
+          {distribution && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-3 text-xs">
+              <div className="font-semibold text-blue-800 mb-2">Monthly distribution preview</div>
+              <div className="grid grid-cols-3 gap-1">
+                {MONTHS.map(m => distribution[m] > 0 && (
+                  <div key={m} className="flex justify-between text-blue-700">
+                    <span>{MONTH_LABELS[m as Month]}</span>
+                    <span className="font-medium">{fmt(distribution[m])}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 pt-2 border-t border-blue-200 flex justify-between text-blue-800 font-semibold">
+                <span>Total</span>
+                <span>{fmt(Object.values(distribution).reduce((s, v) => s + v, 0))}</span>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 py-2 text-sm">
               {error}
