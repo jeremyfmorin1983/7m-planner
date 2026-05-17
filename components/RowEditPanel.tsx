@@ -13,17 +13,21 @@ export interface FieldDef {
   options?: string[]
 }
 
-// Returns which of the 12 month keys fall within start_date..end_date (year-agnostic: uses month numbers only)
+// Parse "YYYY-MM-DD" as local date (avoids UTC-offset shifting the day)
+function parseLocal(s: string): Date {
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 function distributeContract(amount: number, startDate: string, endDate: string): Record<string, number> | null {
   if (!amount || !startDate || !endDate) return null
-  const start = new Date(startDate)
-  const end = new Date(endDate)
+  const start = parseLocal(startDate)
+  const end = parseLocal(endDate)
   if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return null
 
-  // Collect all year/month combos in range, but only keep months 1-12 of the start year
   const year = start.getFullYear()
   const activeMonths: number[] = []
-  const cur = new Date(start.getFullYear(), start.getMonth(), 1)
+  const cur = new Date(year, start.getMonth(), 1)
   const endMonth = new Date(end.getFullYear(), end.getMonth(), 1)
   while (cur <= endMonth) {
     if (cur.getFullYear() === year) activeMonths.push(cur.getMonth() + 1)
@@ -43,11 +47,13 @@ interface Props {
   fields: FieldDef[]
   onClose: () => void
   onSaved: (updated: Record<string, unknown>) => void
+  onDeleted?: (id: string) => void
 }
 
-export default function RowEditPanel({ table, row, fields, onClose, onSaved }: Props) {
+export default function RowEditPanel({ table, row, fields, onClose, onSaved, onDeleted }: Props) {
   const [values, setValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [confirming, setConfirming] = useState<'delete' | 'clear' | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -107,6 +113,39 @@ export default function RowEditPanel({ table, row, fields, onClose, onSaved }: P
       setSaving(false)
     } else {
       onSaved({ ...row, ...updates })
+      onClose()
+    }
+  }
+
+  async function handleClear() {
+    if (!row) return
+    setSaving(true)
+    setError('')
+    const cleared = Object.fromEntries(MONTHS.map(m => [m, 0]))
+    const supabase = createClient()
+    const { error } = await supabase.from(table).update(cleared).eq('id', row.id)
+    if (error) {
+      setError(error.message)
+      setSaving(false)
+    } else {
+      onSaved({ ...row, ...cleared })
+      onClose()
+    }
+  }
+
+  async function handleDelete() {
+    if (!row) return
+    setSaving(true)
+    setError('')
+    const supabase = createClient()
+    const { error } = await supabase.from(table).delete().eq('id', row.id)
+    if (error) {
+      setError(error.message.includes('row-level security')
+        ? "You don't have permission to delete this row."
+        : error.message)
+      setSaving(false)
+    } else {
+      onDeleted?.(row.id as string)
       onClose()
     }
   }
@@ -201,20 +240,58 @@ export default function RowEditPanel({ table, row, fields, onClose, onSaved }: P
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-200 flex gap-3">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-medium rounded-lg py-2 text-sm transition-colors disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 border border-gray-300 rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
+        <div className="px-5 py-4 border-t border-gray-200 space-y-2">
+          {/* Confirm clear */}
+          {confirming === 'clear' && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-xs text-yellow-800 flex items-center justify-between">
+              <span>Clear all monthly amounts?</span>
+              <div className="flex gap-2">
+                <button onClick={handleClear} className="font-semibold text-yellow-900 hover:underline">Yes</button>
+                <button onClick={() => setConfirming(null)} className="text-yellow-700 hover:underline">No</button>
+              </div>
+            </div>
+          )}
+          {/* Confirm delete */}
+          {confirming === 'delete' && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-800 flex items-center justify-between">
+              <span>Permanently delete this row?</span>
+              <div className="flex gap-2">
+                <button onClick={handleDelete} className="font-semibold text-red-900 hover:underline">Yes, delete</button>
+                <button onClick={() => setConfirming(null)} className="text-red-700 hover:underline">No</button>
+              </div>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-medium rounded-lg py-2 text-sm transition-colors disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 border border-gray-300 rounded-lg py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setConfirming('clear')}
+              disabled={saving}
+              className="flex-1 border border-yellow-300 text-yellow-700 hover:bg-yellow-50 rounded-lg py-1.5 text-xs transition-colors disabled:opacity-50"
+            >
+              Clear amounts
+            </button>
+            <button
+              onClick={() => setConfirming('delete')}
+              disabled={saving}
+              className="flex-1 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg py-1.5 text-xs transition-colors disabled:opacity-50"
+            >
+              Delete row
+            </button>
+          </div>
         </div>
       </div>
     </div>

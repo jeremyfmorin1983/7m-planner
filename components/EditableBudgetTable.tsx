@@ -35,6 +35,10 @@ export default function EditableBudgetTable({ table, columns, initialRows, editF
     setRows(prev => prev.map(r => r.id === updated.id ? updated : r))
   }
 
+  function handleDeleted(id: string) {
+    setRows(prev => prev.filter(r => r.id !== id))
+  }
+
   const totals = MONTHS.reduce((acc, m) => {
     acc[m] = rows.reduce((s, r) => s + ((r[m] as number) || 0), 0)
     return acc
@@ -128,6 +132,7 @@ export default function EditableBudgetTable({ table, columns, initialRows, editF
         fields={editFields}
         onClose={() => setEditingRow(null)}
         onSaved={handleSaved}
+        onDeleted={handleDeleted}
       />
     </>
   )
