@@ -24,6 +24,7 @@ export default function EditableBudgetTable({ table, columns, initialRows, editF
   const profile = useProfile()
   const [rows, setRows] = useState(initialRows)
   const [editingRow, setEditingRow] = useState<Record<string, unknown> | null>(null)
+  const [addingRow, setAddingRow] = useState(false)
 
   function canEdit(row: Record<string, unknown>) {
     if (!profile) return false
@@ -31,13 +32,23 @@ export default function EditableBudgetTable({ table, columns, initialRows, editF
     return profile.department === row[deptKey]
   }
 
+  const canAdd = profile?.is_admin || !!profile?.department
+
   function handleSaved(updated: Record<string, unknown>) {
     setRows(prev => prev.map(r => r.id === updated.id ? updated : r))
+  }
+
+  function handleAdded(newRow: Record<string, unknown>) {
+    setRows(prev => [...prev, newRow])
   }
 
   function handleDeleted(id: string) {
     setRows(prev => prev.filter(r => r.id !== id))
   }
+
+  const newRowDefaults: Record<string, unknown> = profile?.is_admin
+    ? {}
+    : { [deptKey]: profile?.department ?? '' }
 
   const totals = MONTHS.reduce((acc, m) => {
     acc[m] = rows.reduce((s, r) => s + ((r[m] as number) || 0), 0)
@@ -46,11 +57,43 @@ export default function EditableBudgetTable({ table, columns, initialRows, editF
   const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0)
 
   if (rows.length === 0) {
-    return <div className="text-sm text-gray-400 py-8 text-center">No data yet.</div>
+    return (
+      <>
+        {canAdd && (
+          <div className="flex justify-end mb-3">
+            <button
+              onClick={() => setAddingRow(true)}
+              className="flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-lg px-4 py-2 transition-colors"
+            >
+              <span className="text-base leading-none">+</span> Add Row
+            </button>
+          </div>
+        )}
+        <div className="text-sm text-gray-400 py-8 text-center">No data yet.</div>
+        <RowEditPanel
+          table={table}
+          row={addingRow ? newRowDefaults : null}
+          fields={editFields}
+          onClose={() => setAddingRow(false)}
+          onSaved={handleAdded}
+          isNew
+        />
+      </>
+    )
   }
 
   return (
     <>
+      {canAdd && (
+        <div className="flex justify-end mb-3">
+          <button
+            onClick={() => setAddingRow(true)}
+            className="flex items-center gap-1.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium rounded-lg px-4 py-2 transition-colors"
+          >
+            <span className="text-base leading-none">+</span> Add Row
+          </button>
+        </div>
+      )}
       <div className="overflow-x-auto rounded-xl border border-gray-200">
         <table className="w-full text-sm">
           <thead>
@@ -133,6 +176,15 @@ export default function EditableBudgetTable({ table, columns, initialRows, editF
         onClose={() => setEditingRow(null)}
         onSaved={handleSaved}
         onDeleted={handleDeleted}
+      />
+
+      <RowEditPanel
+        table={table}
+        row={addingRow ? newRowDefaults : null}
+        fields={editFields}
+        onClose={() => setAddingRow(false)}
+        onSaved={handleAdded}
+        isNew
       />
     </>
   )

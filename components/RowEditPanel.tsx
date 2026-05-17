@@ -48,9 +48,10 @@ interface Props {
   onClose: () => void
   onSaved: (updated: Record<string, unknown>) => void
   onDeleted?: (id: string) => void
+  isNew?: boolean
 }
 
-export default function RowEditPanel({ table, row, fields, onClose, onSaved, onDeleted }: Props) {
+export default function RowEditPanel({ table, row, fields, onClose, onSaved, onDeleted, isNew = false }: Props) {
   const [values, setValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [confirming, setConfirming] = useState<'delete' | 'clear' | null>(null)
@@ -102,18 +103,30 @@ export default function RowEditPanel({ table, row, fields, onClose, onSaved, onD
       if (f.type === 'number') updates[f.key] = v === '' ? null : parseFloat(v)
       else updates[f.key] = v === '' ? null : v
     })
-    // Auto-distribute contract amount across months
     if (distribution) Object.assign(updates, distribution)
     const supabase = createClient()
-    const { error } = await supabase.from(table).update(updates).eq('id', row.id)
-    if (error) {
-      setError(error.message.includes('row-level security')
-        ? "You don't have permission to edit this row."
-        : error.message)
-      setSaving(false)
+    if (isNew) {
+      const { data, error } = await supabase.from(table).insert(updates).select().single()
+      if (error) {
+        setError(error.message.includes('row-level security')
+          ? "You don't have permission to add rows."
+          : error.message)
+        setSaving(false)
+      } else {
+        onSaved(data as Record<string, unknown>)
+        onClose()
+      }
     } else {
-      onSaved({ ...row, ...updates })
-      onClose()
+      const { error } = await supabase.from(table).update(updates).eq('id', row.id)
+      if (error) {
+        setError(error.message.includes('row-level security')
+          ? "You don't have permission to edit this row."
+          : error.message)
+        setSaving(false)
+      } else {
+        onSaved({ ...row, ...updates })
+        onClose()
+      }
     }
   }
 
@@ -203,7 +216,7 @@ export default function RowEditPanel({ table, row, fields, onClose, onSaved, onD
       <div className="flex-1 bg-black/30" onClick={onClose} />
       <div className="w-96 bg-white shadow-xl flex flex-col h-full">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <h2 className="font-semibold text-gray-900">Edit Row</h2>
+          <h2 className="font-semibold text-gray-900">{isNew ? 'Add Row' : 'Edit Row'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
 
@@ -276,22 +289,24 @@ export default function RowEditPanel({ table, row, fields, onClose, onSaved, onD
               Cancel
             </button>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setConfirming('clear')}
-              disabled={saving}
-              className="flex-1 border border-yellow-300 text-yellow-700 hover:bg-yellow-50 rounded-lg py-1.5 text-xs transition-colors disabled:opacity-50"
-            >
-              Clear amounts
-            </button>
-            <button
-              onClick={() => setConfirming('delete')}
-              disabled={saving}
-              className="flex-1 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg py-1.5 text-xs transition-colors disabled:opacity-50"
-            >
-              Delete row
-            </button>
-          </div>
+          {!isNew && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirming('clear')}
+                disabled={saving}
+                className="flex-1 border border-yellow-300 text-yellow-700 hover:bg-yellow-50 rounded-lg py-1.5 text-xs transition-colors disabled:opacity-50"
+              >
+                Clear amounts
+              </button>
+              <button
+                onClick={() => setConfirming('delete')}
+                disabled={saving}
+                className="flex-1 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg py-1.5 text-xs transition-colors disabled:opacity-50"
+              >
+                Delete row
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
