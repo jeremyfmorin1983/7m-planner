@@ -19,6 +19,9 @@ export default function EditableCell({ table, rowId, field, value, canEdit }: Pr
   const [error, setError] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Sync when parent row state changes (e.g. after a panel save)
+  useEffect(() => { setCurrent(value) }, [value])
+
   useEffect(() => { if (editing) inputRef.current?.select() }, [editing])
 
   async function save(raw: string) {
@@ -31,7 +34,6 @@ export default function EditableCell({ table, rowId, field, value, canEdit }: Pr
     const { error } = await supabase.from(table).update({ [field]: num }).eq('id', rowId)
     if (error) {
       setError(true)
-      setCurrent(current)
     } else {
       setCurrent(num)
     }
@@ -61,9 +63,10 @@ export default function EditableCell({ table, rowId, field, value, canEdit }: Pr
   return (
     <button
       onClick={() => setEditing(true)}
+      title={error ? 'Save failed — click to retry' : undefined}
       className={`tabular-nums text-right w-full rounded px-1 hover:bg-blue-50 hover:text-blue-700 transition-colors ${
         saving ? 'opacity-50' : ''
-      } ${error ? 'text-red-500' : current ? 'text-gray-700' : 'text-gray-300'}`}
+      } ${error ? 'text-red-500 bg-red-50' : current ? 'text-gray-700' : 'text-gray-300'}`}
     >
       {saving ? '…' : current ? fmt(current) : '—'}
     </button>
