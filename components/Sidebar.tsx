@@ -8,10 +8,10 @@ import { Profile } from '@/lib/types'
 
 const NAV = [
   { href: '/dashboard', label: 'Dashboard',          icon: '⊞' },
-  { href: '/labor',     label: 'Labor',               icon: '👥' },
-  { href: '/contracts', label: 'Contracts',           icon: '📄' },
-  { href: '/assets',    label: 'Assets',              icon: '📦' },
-  { href: '/other',     label: 'Other',               icon: '⋯' },
+  { href: '/labor',     label: 'Staff',               icon: '👥' },
+  { href: '/contracts', label: 'Commitments',         icon: '📄' },
+  { href: '/assets',    label: 'Equipment & Tech',    icon: '📦' },
+  { href: '/other',     label: 'Everything Else',     icon: '⋯' },
   { href: '/actuals',   label: 'Actuals',             icon: '✓' },
   { href: '/bonus',     label: 'Bonus Calculator',    icon: '★' },
 ]
